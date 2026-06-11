@@ -1,6 +1,7 @@
 import type { SchemaIR } from "../types.js";
 import type { CodeGenContext, SlowGen, SlowGenerator } from "./context.js";
 import { emitRegex, emitSet, emitTemp } from "./context.js";
+import { emitSharedSlowCall, schemaKey } from "./dedupe.js";
 import { slowAny } from "./schemas/any.js";
 import { slowArray } from "./schemas/array.js";
 import { slowBigInt } from "./schemas/bigint.js";
@@ -108,16 +109,17 @@ export function createSlowGen(
     issues: issuesVar,
     ctx,
     visit(ir, overrides) {
-      return generateSlow(
-        ir,
-        createSlowGen(
-          overrides?.input ?? inputExpr,
-          overrides?.output ?? outputExpr,
-          overrides?.path ?? pathExpr,
-          overrides?.issues ?? issuesVar,
-          ctx,
-        ),
-      );
+      const input = overrides?.input ?? inputExpr;
+      const output = overrides?.output ?? outputExpr;
+      const path = overrides?.path ?? pathExpr;
+      const issues = overrides?.issues ?? issuesVar;
+      const ref = ctx.sharedSchemas?.refs.get(schemaKey(ir));
+      if (ref !== undefined) {
+        return emitSharedSlowCall(ref, input, output, path, issues, (prefix) =>
+          emitTemp(ctx, prefix),
+        );
+      }
+      return generateSlow(ir, createSlowGen(input, output, path, issues, ctx));
     },
     temp: (prefix) => emitTemp(ctx, prefix),
     regex: (prefix, pattern, flags) => emitRegex(ctx, prefix, pattern, flags),

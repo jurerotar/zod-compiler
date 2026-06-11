@@ -4,6 +4,9 @@ import { FIN_DECL, FIN_DEFERRED_DECL } from "#src/core/iife.js";
 import { compileSchemas } from "#src/core/pipeline.js";
 
 const __zcFin = new Function("__zcZodError", `${FIN_DECL}; return __zcFin;`)(ZodRealError);
+const __zcFinD = new Function("__zcZodError", `${FIN_DEFERRED_DECL}; return __zcFinD;`)(
+  ZodRealError,
+);
 
 describe("compileSchemas", () => {
   it("returns CompiledSchemaInfo for each schema", () => {
@@ -89,6 +92,90 @@ describe("compileSchemas", () => {
     expect(errors[0]?.name).toBe("badOne");
     expect(results).toHaveLength(1);
     expect(results[0]?.exportName).toBe("goodOne");
+  });
+
+  it("deduplicates structurally identical root schemas through one shared validator", () => {
+    const schema = z.object({
+      id: z.string().uuid(),
+      email: z.email(),
+    });
+    const results = compileSchemas(
+      [
+        { exportName: "CreateUserSchema", schema },
+        {
+          exportName: "ImportedUserSchema",
+          schema: z.object({ id: z.string().uuid(), email: z.email() }),
+        },
+      ],
+      { mode: "inline" },
+    );
+
+    expect(results).toHaveLength(2);
+    expect(results[0]?.sharedCode).toContain("function __zcS_0(");
+    expect(results[0]?.codegenResult.functionDef).toContain("__zcS_0(");
+    expect(results[1]?.codegenResult.functionDef).toContain("__zcS_0(");
+
+    const fn = new Function(
+      "__zcZodError",
+      "__zcFin",
+      "__zcFinD",
+      `${results[0]?.sharedCode}\n${results[1]?.codegenResult.code}\nreturn ${results[1]?.codegenResult.functionDef};`,
+    )(ZodRealError, __zcFin, __zcFinD);
+
+    expect(fn({ id: "550e8400-e29b-41d4-a716-446655440000", email: "a@example.com" }).success).toBe(
+      true,
+    );
+    expect(fn({ id: "bad", email: "a@example.com" }).success).toBe(false);
+  });
+
+  it("extracts duplicated nested schemas and calls the shared helper from different roots", () => {
+    const profile = {
+      email: z.email(),
+      displayName: z.string().min(1),
+    };
+    const results = compileSchemas(
+      [
+        {
+          exportName: "AdminSchema",
+          schema: z.object({ profile: z.object(profile), permissions: z.array(z.string()) }),
+        },
+        {
+          exportName: "CustomerSchema",
+          schema: z.object({ profile: z.object(profile), tier: z.enum(["free", "paid"]) }),
+        },
+      ],
+      { mode: "inline" },
+    );
+
+    expect(results[0]?.sharedCode).toContain("function __zcS_0(");
+    expect(results[0]?.codegenResult.code).toContain("__zcS_0");
+    expect(results[1]?.codegenResult.code).toContain("__zcS_0");
+
+    const admin = new Function(
+      "__zcZodError",
+      "__zcFin",
+      "__zcFinD",
+      `${results[0]?.sharedCode}\n${results[0]?.codegenResult.code}\nreturn ${results[0]?.codegenResult.functionDef};`,
+    )(ZodRealError, __zcFin, __zcFinD);
+    const customer = new Function(
+      "__zcZodError",
+      "__zcFin",
+      "__zcFinD",
+      `${results[0]?.sharedCode}\n${results[1]?.codegenResult.code}\nreturn ${results[1]?.codegenResult.functionDef};`,
+    )(ZodRealError, __zcFin, __zcFinD);
+
+    expect(
+      admin({
+        profile: { email: "admin@example.com", displayName: "Admin" },
+        permissions: ["users"],
+      }).success,
+    ).toBe(true);
+    expect(
+      customer({
+        profile: { email: "bad", displayName: "Customer" },
+        tier: "paid",
+      }).success,
+    ).toBe(false);
   });
 
   it("throws on error when onError is not provided", () => {

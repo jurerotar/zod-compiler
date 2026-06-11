@@ -1,6 +1,7 @@
 import type { SchemaIR } from "../types.js";
 import type { CodeGenContext, CodeGenResult, CodegenMode } from "./context.js";
 import { emitRfDelegate, hasMutation } from "./context.js";
+import type { SharedSchemaPlan } from "./dedupe.js";
 import { createFastGen, generateFast } from "./fast-path.js";
 import { createSlowGen, generateSlow } from "./slow-path.js";
 
@@ -10,6 +11,10 @@ export interface GenerateValidatorOptions {
   refCount?: number;
   /** Codegen output mode. Defaults to "inline". */
   mode?: CodegenMode;
+  /** File-level shared validators for repeated root and nested schemas. */
+  sharedSchemas?: SharedSchemaPlan;
+  /** Stable structural key for the root schema. */
+  rootKey?: string;
 }
 
 /**
@@ -36,6 +41,9 @@ export function generateValidator(
     mode,
     usedHelpers: new Set(),
   };
+  if (options?.sharedSchemas !== undefined) {
+    ctx.sharedSchemas = options.sharedSchemas;
+  }
 
   // Root-level fallback: the whole schema delegates to Zod, so zod's own
   // safeParse result IS the result. Returning it directly skips the issue
@@ -51,6 +59,30 @@ export function generateValidator(
       refCount: options?.refCount ?? 0,
       usedHelpers: ctx.usedHelpers,
       fastFnName: null,
+    };
+  }
+
+  const rootShared =
+    options?.rootKey === undefined ? undefined : options.sharedSchemas?.refs.get(options.rootKey);
+  if (rootShared !== undefined && !hasMutation(ir)) {
+    if (rootShared.fastName !== null) {
+      ctx.usedHelpers.add("__zcFinD");
+    }
+    return {
+      code: ["/* zod-compiler */", ...ctx.preamble].join("\n"),
+      functionDef: [
+        `function ${fnName}(input){`,
+        ...(rootShared.fastName !== null
+          ? [`if(${rootShared.fastName}(input)){return{success:true,data:input};}`]
+          : []),
+        rootShared.fastName !== null
+          ? `return __zcFinD(function(input){var r=${rootShared.slowName}(input,[]);return r.success?[]:r.issues;},input);`
+          : `var r=${rootShared.slowName}(input,[]);if(r.success){return{success:true,data:r.data};}return __zcFin(r.issues,input);`,
+        "}",
+      ].join("\n"),
+      refCount: options?.refCount ?? 0,
+      usedHelpers: ctx.usedHelpers,
+      fastFnName: rootShared.fastName,
     };
   }
 

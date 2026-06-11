@@ -288,6 +288,23 @@ The result: a 5-file project with 10 schemas all using `z.email()` and
 Set `output: "bag"` to additionally drop the original Zod schema reference
 when you don't need `instanceof` / `.shape` access on the compiled output.
 
+Within each transformed file, structurally identical schema IR is also
+deduplicated. If two exported schemas are effectively the same, zod-compiler
+emits one shared validator body and each export wraps it around that export's
+original Zod schema object. If different exported schemas contain the same
+nested object/array/union/etc., that common sub-schema is extracted into a
+shared helper and referenced from both validators.
+
+Measured on minified generated output in default schema-compatible mode
+(`output: "schema"`):
+
+| Scenario                                  | Raw Before | Raw After | Raw Change | Gzip Before | Gzip After | Gzip Change |
+| ----------------------------------------- | ---------- | --------- | ---------- | ----------- | ---------- | ----------- |
+| 10 identical exported roots               | 37,188 B   | 6,325 B   | -83.0%     | 1,714 B     | 1,492 B    | -13.0%      |
+| 10 roots sharing one nested profile       | 59,578 B   | 23,408 B  | -60.7%     | 2,455 B     | 2,243 B    | -8.6%       |
+| 10 mixed roots sharing profile/item/addr. | 53,613 B   | 13,408 B  | -75.0%     | 2,809 B     | 2,262 B    | -19.5%      |
+| **Total**                                 | 150,379 B  | 43,141 B  | **-71.3%** | 6,978 B     | 5,997 B    | **-14.1%**  |
+
 ### Auto Mode: Side Effects Warning
 
 In auto mode (the default), the plugin executes files to inspect their exports. A static pre-filter skips files whose exports provably can't be schemas without executing them — but if a file has schema-shaped exports AND side effects (starts a server, connects to a database), those side effects run at build time.

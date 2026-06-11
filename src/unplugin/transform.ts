@@ -15,6 +15,7 @@ import {
   aggregateUsedHelpers,
   type CompiledSchemaInfo,
   compileSchemas,
+  getSharedSchemaCode,
 } from "#src/core/pipeline.js";
 import type { DiscoveredSchema } from "#src/core/types.js";
 import { discoverSchemas } from "#src/discovery.js";
@@ -73,10 +74,15 @@ class StagedTransform {
   map(): TransformSourceMap | null {
     if (this.maps.length === 0) return null;
     const chain = [...this.maps].reverse();
-    return remapping(
+    const mapped = remapping(
       chain as Parameters<typeof remapping>[0],
       () => null,
     ) as unknown as TransformSourceMap;
+    const normalizedSource = this.source.replace(/\\/g, "/");
+    mapped.sources = mapped.sources.map((source) =>
+      source?.replace(/\\/g, "/") === normalizedSource ? this.source : source,
+    );
+    return mapped;
   }
 }
 
@@ -410,6 +416,11 @@ export async function transformCodeWithMap(
     staged.apply(
       collectCompileRewriteEdits(staged.current, compiled, { zodCompat: options.zodCompat }),
     );
+  }
+
+  const sharedCode = getSharedSchemaCode(compiled);
+  if (sharedCode !== "") {
+    staged.apply([], { offset: 0, text: `${sharedCode}\n` });
   }
 
   const prefix = computeRuntimePrefix(staged.current, usedHelpers, mode, options.runtimeId);

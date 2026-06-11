@@ -10,6 +10,7 @@
 import type { SchemaIR } from "../types.js";
 import type { CodeGenContext, FastGen, FastGenerator } from "./context.js";
 import { emitRegex, emitTemp } from "./context.js";
+import { canUseSharedFast, schemaKey } from "./dedupe.js";
 import { fastAny } from "./schemas/any.js";
 import { fastArray } from "./schemas/array.js";
 import { fastBigInt } from "./schemas/bigint.js";
@@ -102,6 +103,10 @@ export function createFastGen(inputExpr: string, ctx: CodeGenContext): FastGen {
     input: inputExpr,
     ctx,
     visit(ir, overrides) {
+      const ref = ctx.sharedSchemas?.refs.get(schemaKey(ir));
+      if (canUseSharedFast(ref)) {
+        return `${ref.fastName}(${overrides?.input ?? inputExpr})`;
+      }
       return generateFast(ir, createFastGen(overrides?.input ?? inputExpr, ctx));
     },
     temp: (prefix) => emitTemp(ctx, prefix),

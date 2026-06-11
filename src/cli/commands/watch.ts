@@ -35,7 +35,7 @@ const defaultWatchDeps: WatchDeps = {
  * Check if a file path should trigger regeneration.
  */
 export function isWatchTarget(filePath: string): boolean {
-  if (filePath.split(path.sep).includes("node_modules")) return false;
+  if (filePath.split(/[\\/]+/).includes("node_modules")) return false;
   return isSchemaFile(filePath);
 }
 
@@ -47,7 +47,7 @@ export function resolveWatchDirs(inputs: string[]): string[] {
   const dirs: string[] = [];
 
   for (const input of inputs) {
-    const abs = path.resolve(input);
+    const abs = path.isAbsolute(input) ? input : path.resolve(input);
     try {
       const stat = fs.statSync(abs);
       dirs.push(stat.isDirectory() ? abs : path.dirname(abs));
@@ -60,13 +60,20 @@ export function resolveWatchDirs(inputs: string[]): string[] {
   const sorted = [...new Set(dirs)].sort();
   const result: string[] = [];
   for (const dir of sorted) {
-    const isSubdir = result.some((parent) => dir.startsWith(parent + path.sep));
+    const isSubdir = result.some((parent) => isPathInside(dir, parent));
     if (!isSubdir) {
       result.push(dir);
     }
   }
 
   return result;
+}
+
+function isPathInside(child: string, parent: string): boolean {
+  const childParts = child.split(/[\\/]+/).filter(Boolean);
+  const parentParts = parent.split(/[\\/]+/).filter(Boolean);
+  if (childParts.length <= parentParts.length) return false;
+  return parentParts.every((part, index) => childParts[index] === part);
 }
 
 /**
