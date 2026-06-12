@@ -2,7 +2,7 @@
 
 **Compile Zod schemas into zero-overhead validation functions at build time.**
 
-Keep your existing Zod schemas. Get **2-74x faster** validation. No code changes required.
+Keep your existing Zod schemas. Get **2-75x faster** validation. No code changes required.
 
 - [What Gets Compiled](#what-gets-compiled)
 - [Schema Hoisting](#schema-hoisting)
@@ -421,19 +421,24 @@ Output:
 ```
 src/schemas.ts
 
-  CreateUserSchema  [Fast Path]  100% compiled  (5 checks)
-  ├─ name: string (min_length, max_length)
-  ├─ email: string (string_format[email])
-  ├─ age: number (number_format[safeint], greater_than)
-  └─ role: enum
+  CreateUserSchema — 100% compiled (4/4 nodes) | Fast Path: eligible
+    └─ ✓ object
+       ├─ ✓ string .name
+       ├─ ✓ string .email
+       ├─ ✓ number .age
+       └─ ✓ enum .role
 
-  OrderSchema  [Slow Path]  85% compiled  (3 checks)
-  ├─ id: string (string_format[uuid])
-  └─ metadata: object
-      └─ audit: fallback(transform)
-         Hint: Consider z.pipe() to keep inner schema compilable
+  OrderSchema — 67% compiled (2/3 nodes) | Fast Path: ineligible (fallback (transform))
+    └─ ✓ object
+       ├─ ✓ string .id
+       └─ ✓ object .metadata
+          ├─ ✓ string .metadata.region
+          └─ ✗ fallback .metadata.audit (transform)
+                hint: Extract transform into a separate post-processing step
 
-  Summary: 2 schemas | 1 Fast Path, 1 Slow Path | 8/9 nodes (88.9%)
+    Fallbacks:
+      ✗ .metadata.audit — transform
+        Extract transform into a separate post-processing step
 ```
 
 ### CI Integration
@@ -454,7 +459,7 @@ npx zod-compiler check src/schemas.ts --json --fail-under 80
 
 ## What Gets Compiled
 
-### Fully Compiled (2-74x faster)
+### Fully Compiled (2-75x faster)
 
 `string`, `number`, `bigint`, `boolean`, `null`, `undefined`, `any`, `unknown`, `literal`, `enum`, `stringbool`, `date`, `file`, `object`, `strictObject` / `.strict()`, `looseObject`, `array`, `tuple`, `record`, `set`, `map`, `union`, `discriminatedUnion`, `intersection`, `pipe` (non-transform), `optional`, `nullable`, `readonly`, `default`, `catch`, `coerce`, `templateLiteral`, `symbol`, `void`, `nan`, `never`, `lazy` (self-recursive), `transform` / `refine` (zero-capture — see below)
 
@@ -490,37 +495,37 @@ compiles; `z.string().transform((s) => s + suffix)` falls back (it captures
 
 | Scenario                                          | Zod v3 | Zod v4 | **zod-compiler** | Typia | AJV   | vs Zod v4 |
 | ------------------------------------------------- | ------ | ------ | ---------------- | ----- | ----- | --------- |
-| simple string                                     | 12.9M  | 14.4M  | **16.6M**        | 17.0M | 17.5M | 1.2x      |
-| string (min/max)                                  | 12.0M  | 7.4M   | **16.2M**        | 17.0M | 14.5M | 2.2x      |
-| number (int+positive)                             | 11.7M  | 7.8M   | **16.4M**        | 16.9M | 17.0M | 2.1x      |
-| enum                                              | 11.5M  | 11.9M  | **15.3M**        | 15.1M | 16.0M | 1.3x      |
-| bigint (min/max)                                  | 11.7M  | 7.7M   | **16.1M**        | —     | —     | 2.1x      |
-| tuple [string, int, bool]                         | 5.9M   | 5.1M   | **16.9M**        | 17.8M | 16.6M | 3.3x      |
-| record\<string, number\>                          | 3.2M   | 2.8M   | **10.8M**        | 12.1M | 15.7M | 3.9x      |
-| set\<string\> (5 items)                           | 3.7M   | 2.2M   | **14.4M**        | —     | —     | 6.7x      |
-| set\<string\> (20 items)                          | 1.1M   | 667K   | **11.1M**        | —     | —     | **17x**   |
-| map\<string, number\> (5 entries)                 | 1.8M   | 1.2M   | **10.4M**        | —     | —     | 8.7x      |
-| map\<string, number\> (20 entries)                | 582K   | 315K   | **8.1M**         | —     | —     | **26x**   |
-| pipe (non-transform)                              | 8.8M   | 5.8M   | **16.6M**        | —     | —     | 2.9x      |
-| discriminatedUnion (3 variants)                   | 3.1M   | 3.9M   | **15.1M**        | 14.9M | 7.3M  | 3.9x      |
-| strict object (DB row)                            | 1.8M   | 3.2M   | **7.2M**         | —     | —     | 2.3x      |
-| medium object (valid)                             | 1.9M   | 2.4M   | **9.7M**         | 10.5M | 7.4M  | 4.0x      |
-| medium object (invalid)                           | 518K   | 76K    | **5.6M**         | 2.9M  | 7.7M  | **74x**   |
-| large object (10 items)                           | 117K   | 166K   | **7.6M**         | 5.8M  | 1.0M  | **46x**   |
-| large object (100 items)                          | 13K    | 18K    | **1.3M**         | 1.2M  | 110K  | **72x**   |
-| recursive tree (7 nodes)                          | 572K   | 2.1M   | **12.9M**        | 12.1M | 4.7M  | 6.2x      |
-| recursive tree (121 nodes)                        | 31K    | 140K   | **1.9M**         | 1.9M  | 353K  | **14x**   |
-| event log (combined)                              | 364K   | 536K   | **5.9M**         | —     | —     | **11x**   |
-| object with transform (zero-capture)              | 1.0M   | 1.8M   | **5.7M**         | —     | —     | 3.2x      |
-| array 10 × transform (zero-capture)               | 104K   | 188K   | **2.9M**         | —     | —     | **15x**   |
-| array 50 × transform (zero-capture)               | 24K    | 43K    | **737K**         | —     | —     | **17x**   |
-| object with captured transform (partial fallback) | 1.4M   | 6.1M   | **6.5M**         | —     | —     | 1.1x      |
+| simple string                                     | 11.8M  | 13.5M  | **15.6M**        | 15.8M | 16.4M | 1.2x      |
+| string (min/max)                                  | 11.9M  | 7.9M   | **17.2M**        | 17.7M | 15.5M | 2.2x      |
+| number (int+positive)                             | 12.1M  | 7.6M   | **15.9M**        | 17.0M | 16.7M | 2.1x      |
+| enum                                              | 10.8M  | 11.8M  | **15.3M**        | 16.8M | 16.7M | 1.3x      |
+| bigint (min/max)                                  | 10.9M  | 7.2M   | **15.4M**        | —     | —     | 2.1x      |
+| tuple [string, int, bool]                         | 6.0M   | 6.7M   | **16.3M**        | 17.4M | 16.5M | 2.4x      |
+| record\<string, number\>                          | 3.2M   | 2.8M   | **8.2M**         | 11.9M | 15.6M | 2.9x      |
+| set\<string\> (5 items)                           | 3.7M   | 2.3M   | **14.6M**        | —     | —     | 6.3x      |
+| set\<string\> (20 items)                          | 1.3M   | 702K   | **11.9M**        | —     | —     | **17x**   |
+| map\<string, number\> (5 entries)                 | 2.1M   | 1.3M   | **13.0M**        | —     | —     | 9.7x      |
+| map\<string, number\> (20 entries)                | 643K   | 352K   | **8.4M**         | —     | —     | **24x**   |
+| pipe (non-transform)                              | 8.8M   | 5.9M   | **15.7M**        | —     | —     | 2.7x      |
+| discriminatedUnion (3 variants)                   | 3.3M   | 4.3M   | **15.1M**        | 16.4M | 8.0M  | 3.5x      |
+| strict object (DB row)                            | 1.9M   | 3.1M   | **7.0M**         | —     | —     | 2.3x      |
+| medium object (valid)                             | 1.9M   | 2.4M   | **10.1M**        | 11.8M | 7.5M  | 4.2x      |
+| medium object (invalid)                           | 553K   | 81K    | **6.1M**         | 3.1M  | 8.0M  | **75x**   |
+| large object (10 items)                           | 124K   | 169K   | **8.0M**         | 6.1M  | 1.2M  | **47x**   |
+| large object (100 items)                          | 13K    | 18K    | **1.4M**         | 1.3M  | 122K  | **74x**   |
+| recursive tree (7 nodes)                          | 583K   | 2.1M   | **12.8M**        | 12.4M | 4.5M  | 6.0x      |
+| recursive tree (121 nodes)                        | 33K    | 142K   | **2.4M**         | 2.0M  | 377K  | **17x**   |
+| event log (combined)                              | 381K   | 600K   | **5.6M**         | —     | —     | 9.3x      |
+| object with transform (zero-capture)              | 1.2M   | 1.9M   | **6.2M**         | —     | —     | 3.3x      |
+| array 10 × transform (zero-capture)               | 110K   | 217K   | **3.1M**         | —     | —     | **14x**   |
+| array 50 × transform (zero-capture)               | 25K    | 44K    | **822K**         | —     | —     | **19x**   |
+| object with captured transform (partial fallback) | 1.4M   | 6.3M   | **6.4M**         | —     | —     | 1.0x      |
 
-_ops/s, higher is better. "—" = not supported by the library. Measured with `vitest bench` on Apple M-series (zod 4.3.6, zod v3 3.23.8, typia 12, ajv 8)._
+_ops/s, higher is better. "—" = not supported by the library. Measured with `vitest bench` on Apple M4 Max (zod 4.3.6, zod v3 3.23.8, typia 12, ajv 8)._
 
-Performance scales with schema complexity. Nested objects and arrays see the biggest gains because zod-compiler eliminates per-node traversal overhead. `discriminatedUnion` uses O(1) `switch` dispatch instead of Zod's sequential trial. The invalid-input row is large because failed `safeParse` defers error materialization until `.error` is read. Zero-capture `transform`/`refine` callbacks are compiled (3-17x); schemas with captured callbacks fall back per-field and roughly match Zod.
+Performance scales with schema complexity. Nested objects and arrays see the biggest gains because zod-compiler eliminates per-node traversal overhead. `discriminatedUnion` uses O(1) `switch` dispatch instead of Zod's sequential trial. The invalid-input row is large because failed `safeParse` defers error materialization until `.error` is read. Zero-capture `transform`/`refine` callbacks are compiled (3-19x); schemas with captured callbacks fall back per-field and roughly match Zod.
 
-`parse()` (throwing API) rides a zero-allocation fast path: medium object 2.2M → 9.1M ops/s (4.2x), large object (100 items) 18K → 1.4M ops/s (76x).
+`parse()` (throwing API) rides a zero-allocation fast path: medium object 2.2M → 9.7M ops/s (4.4x), large object (100 items) 18K → 1.4M ops/s (77x).
 
 ```bash
 pnpm benchmark   # run locally

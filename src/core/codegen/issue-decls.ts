@@ -61,7 +61,19 @@ export const ISSUE_DECLS: Readonly<Record<string, string>> = {
 export const ZC_FSR_DECL =
   'function __zcFsr(v,s){var vd=((""+v).split(".")[1]||"").length;var ss=""+s;var sd=(ss.split(".")[1]||"").length;if(sd===0&&/\\d?e-\\d?/.test(ss)){var m=ss.match(/\\d?e-(\\d?)/);if(m&&m[1]){sd=parseInt(m[1],10);}}var d=vd>sd?vd:sd;var vi=parseInt(v.toFixed(d).replace(".",""),10);var si=parseInt(s.toFixed(d).replace(".",""),10);return (vi%si)/Math.pow(10,d);}';
 
+/**
+ * Hoisted `Object.prototype.hasOwnProperty` reference. Record fast/slow paths
+ * iterate keys with `for(k in o)` (no `Object.keys` array allocation) and guard
+ * each key with `__zcHop.call(o,k)` to skip inherited enumerable properties —
+ * yielding the exact own-enumerable string-key set `Object.keys` would, so
+ * fast/slow stay in agreement and parity with zod's own-key record semantics is
+ * preserved. The hoisted reference inlines in V8; reading the prototype property
+ * per call would not.
+ */
+export const ZC_HOP_DECL = "const __zcHop=Object.prototype.hasOwnProperty;";
+
 /** Non-issue runtime helper declarations hosted in the virtual module. */
 export const RUNTIME_HELPER_DECLS: Readonly<Record<string, string>> = {
   __zcFsr: ZC_FSR_DECL,
+  __zcHop: ZC_HOP_DECL,
 };
