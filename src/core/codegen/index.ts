@@ -1,6 +1,7 @@
 import type { SchemaIR } from "../types.js";
 import type { CodeGenContext, CodeGenResult, CodegenMode } from "./context.js";
 import { emitRfDelegate, hasMutation } from "./context.js";
+import type { SharedSchemaPlan } from "./dedupe.js";
 import { createFastGen, generateFast } from "./fast-path.js";
 import { createSlowGen, generateSlow } from "./slow-path.js";
 
@@ -10,6 +11,11 @@ export interface GenerateValidatorOptions {
   refCount?: number;
   /** Codegen output mode. Defaults to "inline". */
   mode?: CodegenMode;
+  /**
+   * File-level shared slow-walk plan (schema deduplication). Applied only to
+   * mutation-free schemas, so shared walks stay on the deferred cold path.
+   */
+  sharedSchemas?: SharedSchemaPlan;
 }
 
 /**
@@ -36,6 +42,13 @@ export function generateValidator(
     mode,
     usedHelpers: new Set(),
   };
+
+  // Enable slow-walk sharing only for mutation-free schemas: their walk is
+  // reached solely through __zcFinD (the deferred, cold error path), so every
+  // shared call runs only when `.error` is read — never on a successful parse.
+  if (options?.sharedSchemas !== undefined && !hasMutation(ir)) {
+    ctx.sharedSchemas = options.sharedSchemas;
+  }
 
   // Root-level fallback: the whole schema delegates to Zod, so zod's own
   // safeParse result IS the result. Returning it directly skips the issue
@@ -72,7 +85,12 @@ export function generateValidator(
   }
 
   const sg = createSlowGen("_d", "_d", "[]", "_e", ctx);
-  const slowCode = generateSlow(ir, sg);
+  // When the root schema's own shape is shared (it recurs as a sub-schema of
+  // another export, or as a duplicate root), its slow walk delegates to the
+  // shared function instead of emitting a second full copy. The fast path is
+  // still generated inline above — only the cold walk is shared.
+  const rootRef = ctx.sharedSchemas?.refFor(ir);
+  const slowCode = rootRef !== undefined ? `${rootRef.name}(_d,[],_e);` : generateSlow(ir, sg);
 
   const buildCode = (): string => ["/* zod-compiler */", ...ctx.preamble].join("\n");
 

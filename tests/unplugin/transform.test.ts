@@ -392,6 +392,27 @@ describe("transformCode() E2E", () => {
     expect(result).toBeNull();
   });
 
+  it("hoists a shared nested shape into one module-scope __zcSw walk", async () => {
+    const fixturePath = path.join(fixturesDir, "dedup-schema.ts");
+    const code = readFixtureAsUserCode(fixturePath);
+
+    const result = await transformCode(code, fixturePath, { mode: "lean" });
+
+    expect(result).not.toBeNull();
+    const out = result ?? "";
+    // Exactly one shared Address walk, emitted at module scope and reused by both exports.
+    expect((out.match(/function __zcSw_\d+\(input,path,_e\)/g) ?? []).length).toBe(1);
+    expect((out.match(/__zcSw_0\(/g) ?? []).length).toBeGreaterThanOrEqual(3);
+    // The shared block follows the runtime import (its helpers ride that import).
+    const importIdx = out.indexOf('from "virtual:zod-compiler/runtime"');
+    const sharedIdx = out.indexOf("/* zod-compiler shared */");
+    expect(importIdx).toBeGreaterThanOrEqual(0);
+    expect(sharedIdx).toBeGreaterThan(importIdx);
+    // Both exports still compile and the fast path stays inline (no shared call in __fc).
+    expect(out).toContain("safeParse_validateUser");
+    expect(out).toContain("safeParse_validateCompany");
+  });
+
   it("returns null when code does not reference zod-compiler", async () => {
     const code = `export const x = 1;`;
     const result = await transformCode(code, "/fake/path.ts", { mode: "lean" });

@@ -1,4 +1,5 @@
 import type { BigIntCheckIR, CheckIR, DateCheckIR, SchemaIR, SetCheckIR } from "../types.js";
+import type { SharedSchemaPlan } from "./dedupe.js";
 import {
   lookupFastRegexSource,
   lookupWellKnownRegex,
@@ -48,6 +49,12 @@ export interface CodeGenContext {
   recFastName?: string;
   /** Dedup cache for hosted zero-capture effect functions: source text → preamble var. */
   effectFnCache?: Map<string, string>;
+  /**
+   * File-level shared slow-walk plan. Set only when generating a mutation-free
+   * schema (so shared walks stay on the deferred cold path); the slow-path
+   * visit() consults it to replace a repeated sub-IR with a `__zcSw_N` call.
+   */
+  sharedSchemas?: SharedSchemaPlan;
 }
 
 // ─── Slow Path context ────────────────────────────────────────────────────────

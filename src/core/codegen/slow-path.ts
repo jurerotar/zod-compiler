@@ -108,16 +108,19 @@ export function createSlowGen(
     issues: issuesVar,
     ctx,
     visit(ir, overrides) {
-      return generateSlow(
-        ir,
-        createSlowGen(
-          overrides?.input ?? inputExpr,
-          overrides?.output ?? outputExpr,
-          overrides?.path ?? pathExpr,
-          overrides?.issues ?? issuesVar,
-          ctx,
-        ),
-      );
+      const input = overrides?.input ?? inputExpr;
+      const output = overrides?.output ?? outputExpr;
+      const path = overrides?.path ?? pathExpr;
+      const issues = overrides?.issues ?? issuesVar;
+      // Shared sub-schema: call the file-level `__zcSw_N(input, path, issues)`
+      // walk (signature defined in dedupe.ts) instead of inlining a duplicate.
+      // Only mutation-free schemas enable the plan, so the shared walk needs no
+      // output write-back and runs on the cold (deferred) path only.
+      const ref = ctx.sharedSchemas?.refFor(ir);
+      if (ref !== undefined) {
+        return `${ref.name}(${input},${path},${issues});`;
+      }
+      return generateSlow(ir, createSlowGen(input, output, path, issues, ctx));
     },
     temp: (prefix) => emitTemp(ctx, prefix),
     regex: (prefix, pattern, flags) => emitRegex(ctx, prefix, pattern, flags),

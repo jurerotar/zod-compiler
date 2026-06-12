@@ -20,6 +20,11 @@ export interface EmitterOptions {
    * When false, produces a minimal plain object (smaller bundle).
    */
   zodCompat?: boolean | undefined;
+  /**
+   * File-level shared validator declarations (schema dedup). Emitted once at
+   * module scope so each compiled export can call into them.
+   */
+  sharedCode?: string | undefined;
 }
 
 export function generateCompiledFileContent(
@@ -62,6 +67,7 @@ export function generateCompiledFileContent(
     MK_VALIDATOR_DECL,
     FIN_DECL,
     FIN_DEFERRED_DECL,
+    ...(options?.sharedCode ? ["", options.sharedCode] : []),
     "",
     ...importLine,
     ...exports,

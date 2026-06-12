@@ -121,12 +121,13 @@ export async function generateFile(
     return null;
   }
 
-  const codegenResults = compileSchemas(schemas, { mode: "inline" });
+  const { schemas: codegenResults, shared } = compileSchemas(schemas, { mode: "inline" });
 
   const outputPath = resolveOutputPath(filePath, outputFlag);
   const sourceRelPath = path.relative(path.dirname(outputPath), filePath);
   const content = generateCompiledFileContent(codegenResults, sourceRelPath, {
     zodCompat: options?.zodCompat,
+    sharedCode: shared.code,
   });
 
   await writeCompiledFile(outputPath, content);

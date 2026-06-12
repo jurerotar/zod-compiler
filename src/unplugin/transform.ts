@@ -3,6 +3,7 @@ import { parseExpressionAt } from "acorn";
 import MagicString from "magic-string";
 import picomatch from "picomatch";
 import type { CodegenMode } from "#src/core/codegen/context.js";
+import { SHARED_BLOCK_MARKER } from "#src/core/codegen/dedupe.js";
 import {
   FIN_DECL,
   FIN_DEFERRED_DECL,
@@ -321,7 +322,7 @@ export async function transformCodeWithMap(
   // Lean mode (Vite/Rollup/etc.) uses virtual:zod-compiler/runtime imports for cross-file dedup.
   // Inline mode (webpack/rspack) emits self-contained file-level helpers.
   let failedCount = 0;
-  const compiled = timePhase("compile", () =>
+  const { schemas: compiled, shared } = timePhase("compile", () =>
     compileSchemas(schemas, {
       mode,
       onError(exportName, error) {
@@ -366,6 +367,10 @@ export async function transformCodeWithMap(
   usedHelpers.add("__zcMkv");
   usedHelpers.add("__zcFin");
   for (const helper of hoistHelpers) {
+    usedHelpers.add(helper);
+  }
+  // Shared dedup validators ride the same runtime import.
+  for (const helper of shared.usedHelpers) {
     usedHelpers.add(helper);
   }
 
@@ -413,8 +418,16 @@ export async function transformCodeWithMap(
   }
 
   const prefix = computeRuntimePrefix(staged.current, usedHelpers, mode, options.runtimeId);
-  if (prefix !== null) {
-    staged.apply([], { offset: 0, text: prefix });
+  // Head = runtime helpers/import, then the file-level shared dedup block, then
+  // the rewritten source. The shared `__zcSw_N` functions live at module scope
+  // so every IIFE closes over them; they must follow the runtime import (lean)
+  // and the helper decls (inline) that they reference. Guard against
+  // double-injection on watch/HMR re-runs the same way computeRuntimePrefix
+  // does — a second copy would redeclare every `__zcSw_N`.
+  const needsShared = shared.code !== "" && !staged.current.includes(SHARED_BLOCK_MARKER);
+  const head = (prefix ?? "") + (needsShared ? `${shared.code}\n` : "");
+  if (head !== "") {
+    staged.apply([], { offset: 0, text: head });
   }
   return { code: staged.current, map: staged.map() };
 }
