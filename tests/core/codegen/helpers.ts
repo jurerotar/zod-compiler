@@ -2,18 +2,21 @@ import { ZodRealError } from "zod";
 import type { CodeGenContext } from "#src/core/codegen/context.js";
 import { createFastGen, generateFast } from "#src/core/codegen/fast-path.js";
 import { generateValidator } from "#src/core/codegen/index.js";
-import { FIN_DECL, FIN_DEFERRED_DECL } from "#src/core/iife.js";
+import { FAIL_CLASS_DECL, FIN_DECL, FIN_DEFERRED_DECL } from "#src/core/iife.js";
 import type { SchemaIR } from "#src/core/types.js";
 
 // __zcMsg intentionally undefined: codegen tests verify raw issues, not locale-transformed messages.
-const __zcFin = new Function("__zcMsg", "__zcZodError", `${FIN_DECL}; return __zcFin;`)(
-  undefined,
-  ZodRealError,
-);
-const __zcFinD = new Function("__zcMsg", "__zcZodError", `${FIN_DEFERRED_DECL}; return __zcFinD;`)(
-  undefined,
-  ZodRealError,
-);
+// FAIL_CLASS_DECL hosts the shared failure-result prototype both finalizers construct.
+const __zcFin = new Function(
+  "__zcMsg",
+  "__zcZodError",
+  `${FAIL_CLASS_DECL}${FIN_DECL}; return __zcFin;`,
+)(undefined, ZodRealError);
+const __zcFinD = new Function(
+  "__zcMsg",
+  "__zcZodError",
+  `${FAIL_CLASS_DECL}${FIN_DEFERRED_DECL}; return __zcFinD;`,
+)(undefined, ZodRealError);
 
 /**
  * Helper: generate code from IR, compile it, and return the safeParse function.

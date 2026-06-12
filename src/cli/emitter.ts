@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
+  FAIL_CLASS_DECL,
   FIN_DECL,
   FIN_DEFERRED_DECL,
   generateIIFE,
@@ -64,6 +65,7 @@ export function generateCompiledFileContent(
     "",
     ZOD_CONFIG_IMPORT,
     ZOD_MSG_DECLARATION,
+    FAIL_CLASS_DECL,
     MK_VALIDATOR_DECL,
     FIN_DECL,
     FIN_DEFERRED_DECL,

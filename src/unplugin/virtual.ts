@@ -15,6 +15,7 @@
 import { ISSUE_DECLS, RUNTIME_HELPER_DECLS } from "#src/core/codegen/issue-decls.js";
 import { WELL_KNOWN_REGEXES } from "#src/core/codegen/well-known-regex.js";
 import {
+  FAIL_CLASS_DECL,
   FIN_DECL,
   FIN_DEFERRED_DECL,
   MK_VALIDATOR_DECL,
@@ -38,6 +39,9 @@ function buildRuntimeSource(): string {
   const parts: string[] = [
     ZOD_CONFIG_IMPORT,
     ZOD_MSG_DECLARATION,
+    // Module-local (never imported by generated code) — __zcFin/__zcFinD below
+    // construct it. Must precede them; both reference __ZcFail by closure.
+    FAIL_CLASS_DECL,
     `export ${MK_VALIDATOR_DECL}`,
     `export ${FIN_DECL}`,
     `export ${FIN_DEFERRED_DECL}`,

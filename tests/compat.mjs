@@ -14,7 +14,7 @@
 import { ZodRealError, z } from "zod";
 import { generateValidator } from "../dist/core/codegen/index.js";
 import { extractSchema } from "../dist/core/extract/index.js";
-import { FIN_DECL } from "../dist/core/iife.js";
+import { FAIL_CLASS_DECL, FIN_DECL } from "../dist/core/iife.js";
 import { compile } from "../dist/index.js";
 
 let passed = 0;
@@ -66,7 +66,7 @@ const __msg = z.config().localeError;
 const fn = new Function(
   "__msg",
   "__ZodError",
-  `${FIN_DECL}\n${result.code}\nreturn ${result.functionDef};`,
+  `${FAIL_CLASS_DECL}${FIN_DECL}\n${result.code}\nreturn ${result.functionDef};`,
 );
 const safeParse = fn(__msg, ZodRealError);
 

@@ -3,7 +3,13 @@ import { ZodRealError, z } from "zod";
 import { generateValidator } from "#src/core/codegen/index.js";
 import type { RefEntry } from "#src/core/extract/index.js";
 import { extractSchema } from "#src/core/extract/index.js";
-import { FIN_DECL, FIN_DEFERRED_DECL, generateIIFE, MK_VALIDATOR_DECL } from "#src/core/iife.js";
+import {
+  FAIL_CLASS_DECL,
+  FIN_DECL,
+  FIN_DEFERRED_DECL,
+  generateIIFE,
+  MK_VALIDATOR_DECL,
+} from "#src/core/iife.js";
 import type { CompiledSchemaInfo } from "#src/core/pipeline.js";
 
 type MkvFn = (
@@ -15,7 +21,7 @@ const __zcMkv = new Function(`${MK_VALIDATOR_DECL}; return __zcMkv;`)() as MkvFn
 // __zcFin needs __zcMsg and __zcZodError in scope; both are passed per-execution
 type FinFn = (e: unknown[], d: unknown) => { success: boolean; data?: unknown; error?: unknown };
 function makeFinFn(msg: unknown, ZodError: unknown): FinFn {
-  return new Function("__zcMsg", "__zcZodError", `${FIN_DECL}; return __zcFin;`)(
+  return new Function("__zcMsg", "__zcZodError", `${FAIL_CLASS_DECL}${FIN_DECL}; return __zcFin;`)(
     msg,
     ZodError,
   ) as FinFn;
@@ -167,7 +173,7 @@ describe("generateIIFE() — runtime execution", () => {
       "__zcZodError",
       "__zcMkv",
       "__zcFin",
-      `${FIN_DEFERRED_DECL}\nreturn ${iife};`,
+      `${FAIL_CLASS_DECL}${FIN_DEFERRED_DECL}\nreturn ${iife};`,
     );
     return fn({}, __zcMsg, ZodRealError, __zcMkv, __zcFin) as {
       parse: (input: unknown) => unknown;
@@ -285,7 +291,7 @@ describe("generateIIFE() — shared schema instance (CSE/dedup + identifier sche
       "__zcZodError",
       "__zcMkv",
       "__zcFin",
-      `${FIN_DEFERRED_DECL}\nreturn ${iife};`,
+      `${FAIL_CLASS_DECL}${FIN_DEFERRED_DECL}\nreturn ${iife};`,
     );
     return fn(schema, __zcMsg, ZodRealError, __zcMkv, __zcFin) as {
       safeParse: (input: unknown) => {

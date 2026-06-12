@@ -1,16 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { ZodRealError, z } from "zod";
-import { FIN_DECL, FIN_DEFERRED_DECL } from "#src/core/iife.js";
+import { FAIL_CLASS_DECL, FIN_DECL, FIN_DEFERRED_DECL } from "#src/core/iife.js";
 import { compileSchemas, type CompiledSchemaInfo } from "#src/core/pipeline.js";
 
-const __zcFin = new Function("__zcMsg", "__zcZodError", `${FIN_DECL}; return __zcFin;`)(
-  undefined,
-  ZodRealError,
-);
-const __zcFinD = new Function("__zcMsg", "__zcZodError", `${FIN_DEFERRED_DECL}; return __zcFinD;`)(
-  undefined,
-  ZodRealError,
-);
+const __zcFin = new Function(
+  "__zcMsg",
+  "__zcZodError",
+  `${FAIL_CLASS_DECL}${FIN_DECL}; return __zcFin;`,
+)(undefined, ZodRealError);
+const __zcFinD = new Function(
+  "__zcMsg",
+  "__zcZodError",
+  `${FAIL_CLASS_DECL}${FIN_DEFERRED_DECL}; return __zcFinD;`,
+)(undefined, ZodRealError);
 
 type Runnable = (input: unknown) => {
   success: boolean;

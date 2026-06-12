@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { ZodRealError, z } from "zod";
-import { FIN_DECL, FIN_DEFERRED_DECL } from "#src/core/iife.js";
+import { FAIL_CLASS_DECL, FIN_DECL, FIN_DEFERRED_DECL } from "#src/core/iife.js";
 import { compileSchemas } from "#src/core/pipeline.js";
 
-const __zcFin = new Function("__zcZodError", `${FIN_DECL}; return __zcFin;`)(ZodRealError);
+const __zcFin = new Function("__zcZodError", `${FAIL_CLASS_DECL}${FIN_DECL}; return __zcFin;`)(
+  ZodRealError,
+);
 
 describe("compileSchemas", () => {
   it("returns CompiledSchemaInfo for each schema", () => {
@@ -133,7 +135,7 @@ describe("compileSchemas", () => {
       "__zcZodError",
       "__zcFin",
       "__rf",
-      `${FIN_DEFERRED_DECL}\n${info?.codegenResult.code}\nreturn ${info?.codegenResult.functionDef};`,
+      `${FAIL_CLASS_DECL}${FIN_DEFERRED_DECL}\n${info?.codegenResult.code}\nreturn ${info?.codegenResult.functionDef};`,
     )(ZodRealError, __zcFin, fbArr);
 
     // Each call with undefined should invoke the factory, producing different values
@@ -157,7 +159,7 @@ describe("compileSchemas", () => {
       "__zcZodError",
       "__zcFin",
       "__rf",
-      `${FIN_DEFERRED_DECL}\n${info?.codegenResult.code}\nreturn ${info?.codegenResult.functionDef};`,
+      `${FAIL_CLASS_DECL}${FIN_DEFERRED_DECL}\n${info?.codegenResult.code}\nreturn ${info?.codegenResult.functionDef};`,
     )(ZodRealError, __zcFin, fbArr);
 
     const r1 = fn(undefined);
@@ -184,7 +186,7 @@ describe("compileSchemas", () => {
       "__zcZodError",
       "__zcFin",
       "__rf",
-      `${FIN_DEFERRED_DECL}\n${info?.codegenResult.code}\nreturn ${info?.codegenResult.functionDef};`,
+      `${FAIL_CLASS_DECL}${FIN_DEFERRED_DECL}\n${info?.codegenResult.code}\nreturn ${info?.codegenResult.functionDef};`,
     )(ZodRealError, __zcFin, fbArr);
 
     expect(fn(undefined)).toEqual({ success: true, data: "hello" });
@@ -205,7 +207,7 @@ describe("compileSchemas", () => {
       "__zcZodError",
       "__zcFin",
       "__rf",
-      `${FIN_DEFERRED_DECL}\n${info?.codegenResult.code}\nreturn ${info?.codegenResult.functionDef};`,
+      `${FAIL_CLASS_DECL}${FIN_DEFERRED_DECL}\n${info?.codegenResult.code}\nreturn ${info?.codegenResult.functionDef};`,
     )(ZodRealError, __zcFin, fbArr);
 
     // undefined → factory generates unique UUID each time
@@ -243,7 +245,7 @@ describe("compileSchemas", () => {
       "__zcZodError",
       "__zcFin",
       "__rf",
-      `${FIN_DEFERRED_DECL}\n${info?.codegenResult.code}\nreturn ${info?.codegenResult.functionDef};`,
+      `${FAIL_CLASS_DECL}${FIN_DEFERRED_DECL}\n${info?.codegenResult.code}\nreturn ${info?.codegenResult.functionDef};`,
     )(ZodRealError, __zcFin, fbArr);
 
     const r1 = fn(undefined);
@@ -277,7 +279,7 @@ describe("compileSchemas", () => {
       "__zcZodError",
       "__zcFin",
       "__rf",
-      `${FIN_DEFERRED_DECL}\n${info?.codegenResult.code}\nreturn ${info?.codegenResult.functionDef};`,
+      `${FAIL_CLASS_DECL}${FIN_DEFERRED_DECL}\n${info?.codegenResult.code}\nreturn ${info?.codegenResult.functionDef};`,
     )(ZodRealError, __zcFin, fbArr);
 
     // Omitted fields get defaults

@@ -13,27 +13,43 @@ export const ZOD_CONFIG_IMPORT =
 export const ZOD_MSG_DECLARATION = "var __zcMsg=__zodCompilerConfig().localeError;";
 
 /**
- * Finalization helper. Inline mode (CLI emitter) declares it once per compiled
- * file; lean mode (all unplugin bundlers) exports it once per bundle from the
- * plugin-materialized runtime module.
- * Processes issues (adds messages, strips input) and returns SafeParseResult.
- * Each generated safeParse function calls __zcFin(_e, _d) instead of inlining this logic.
+ * Shared failure-result for __zcFin / __zcFinD. Inline mode (CLI emitter)
+ * declares it once per compiled file; lean mode (all unplugin bundlers) declares
+ * it once per bundle in the plugin-materialized runtime module (module-local —
+ * generated code only ever references __zcFin/__zcFinD, never __ZcFail).
  *
- * The locale default (__zcMsg) is applied ONLY when an issue carries no message,
- * mirroring Zod's precedence: check/schema-level custom messages baked into
- * generated issues — and messages on issues copied from fallback sub-schemas —
- * must never be overwritten by the locale map.
+ * Why a prototype getter and not `{success:false, get error(){...}}`: an object
+ * literal with an inline accessor forces V8 down its slow accessor-defining
+ * allocation path — ~110ns per failure, measured — which dominates the entire
+ * invalid-input cost whenever callers never read `.error`. Hosting `error` on
+ * the prototype turns each failure into a plain field-only instantiation (~2ns,
+ * ~13x), with the lazy-cache semantics intact. (Trade-off: `error` is a
+ * prototype accessor, so it no longer shows up in `Object.keys(result)` / spread
+ * / JSON.stringify of the result wrapper — `.success`/`.error`/`.data` access,
+ * destructuring, and `in` are unaffected.)
  *
- * The whole finalization (message fill, input strip, ZodError construction)
- * runs lazily inside a cached accessor (zod v3's safeParse trick): zod v4's
- * $ZodError initializer JSON.stringifies all issues into `message` and
- * $ZodRealError's Error parent captures a stack trace — paying that (plus a
- * locale __zcMsg call per issue) on every failed safeParse dominates
- * invalid-input cost when callers never read `.error`. The issues array is
- * only observable through `.error`, so deferring is safe.
+ * One class serves both finalizers, so the instances share one hidden class:
+ * __zcFin passes pre-collected issues in `_e` (with `_f===null`); __zcFinD
+ * passes the hosted slow-walk in `_f` plus the input in `_i`, and the getter
+ * runs the walk on first `.error` read. The whole finalization — locale fill
+ * (__zcMsg applied ONLY when an issue carries no message, never overwriting a
+ * baked-in custom/fallback message), input strip, and ZodError construction
+ * (zod v4 JSON.stringifies every issue into `message` and captures a stack
+ * trace) — stays deferred inside the cached accessor exactly as before, since
+ * the issues array is observable solely through `.error`.
  */
+export const FAIL_CLASS_DECL =
+  "function __ZcFail(e,f,i){this.success=false;this._e=e;this._f=f;this._i=i;this._c=undefined;}" +
+  'Object.defineProperty(__ZcFail.prototype,"error",{configurable:true,get:function(){' +
+  "if(this._c)return this._c;" +
+  "var e=this._f!==null?this._f(this._i):this._e;" +
+  'for(var i=0;i<e.length;i++){if(e[i].message===undefined&&typeof __zcMsg==="function")e[i].message=__zcMsg(e[i]);e[i].input=undefined;}' +
+  "return this._c=new __zcZodError(e);}});";
+
+/** Eager finalizer (mutation / partial-fast-path schemas): issues already
+ * collected in `e`; success short-circuits to a plain result literal. */
 export const FIN_DECL =
-  'function __zcFin(e,d){if(!e.length)return{success:true,data:d};var c;return{success:false,get error(){if(c)return c;for(var i=0;i<e.length;i++){if(e[i].message===undefined&&typeof __zcMsg==="function")e[i].message=__zcMsg(e[i]);e[i].input=undefined;}return c=new __zcZodError(e);}};}';
+  "function __zcFin(e,d){if(!e.length)return{success:true,data:d};return new __ZcFail(e,null,null);}";
 
 /**
  * Deferred-collection finalizer for Fast-Path-eligible schemas. When the
@@ -57,8 +73,7 @@ export const FIN_DECL =
  * mutated value (zod materializes at parse time). Same caveat class as the
  * documented __zcFin deferral.
  */
-export const FIN_DEFERRED_DECL =
-  'function __zcFinD(f,inp){var c;return{success:false,get error(){if(c)return c;var e=f(inp);for(var i=0;i<e.length;i++){if(e[i].message===undefined&&typeof __zcMsg==="function")e[i].message=__zcMsg(e[i]);e[i].input=undefined;}return c=new __zcZodError(e);}};}';
+export const FIN_DEFERRED_DECL = "function __zcFinD(f,inp){return new __ZcFail(null,f,inp);}";
 
 /**
  * Validator factory. Inline mode (CLI emitter) declares it once per compiled

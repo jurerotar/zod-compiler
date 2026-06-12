@@ -3,7 +3,7 @@ import { ZodError, ZodRealError, z } from "zod";
 import { generateValidator } from "#src/core/codegen/index.js";
 import type { RefEntry } from "#src/core/extract/index.js";
 import { extractSchema } from "#src/core/extract/index.js";
-import { FIN_DECL, FIN_DEFERRED_DECL } from "#src/core/iife.js";
+import { FAIL_CLASS_DECL, FIN_DECL, FIN_DEFERRED_DECL } from "#src/core/iife.js";
 import { zodAtLeast } from "./zod-version.js";
 
 /**
@@ -16,10 +16,11 @@ function compileForErrorTest(schema: z.ZodType, name = "test") {
   const result = generateValidator(ir, name, { refCount: refEntries.length });
   // oxlint-disable-next-line typescript/no-non-null-assertion -- localeError is always set in Zod v4
   const __zcMsg = z.config().localeError!;
-  const __zcFin = new Function("__zcMsg", "__zcZodError", `${FIN_DECL}; return __zcFin;`)(
-    __zcMsg,
-    ZodRealError,
-  );
+  const __zcFin = new Function(
+    "__zcMsg",
+    "__zcZodError",
+    `${FAIL_CLASS_DECL}${FIN_DECL}; return __zcFin;`,
+  )(__zcMsg, ZodRealError);
   const refSchemas = refEntries.map((e) => e.schema);
   const fn =
     refSchemas.length > 0
@@ -28,13 +29,13 @@ function compileForErrorTest(schema: z.ZodType, name = "test") {
           "__zcZodError",
           "__zcFin",
           "__rf",
-          `${FIN_DEFERRED_DECL}\n${result.code}\nreturn ${result.functionDef};`,
+          `${FAIL_CLASS_DECL}${FIN_DEFERRED_DECL}\n${result.code}\nreturn ${result.functionDef};`,
         )
       : new Function(
           "__zcMsg",
           "__zcZodError",
           "__zcFin",
-          `${FIN_DEFERRED_DECL}\n${result.code}\nreturn ${result.functionDef};`,
+          `${FAIL_CLASS_DECL}${FIN_DEFERRED_DECL}\n${result.code}\nreturn ${result.functionDef};`,
         );
   return (
     refSchemas.length > 0

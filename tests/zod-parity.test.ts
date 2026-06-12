@@ -16,13 +16,14 @@ import { ZodRealError, z } from "zod";
 import { generateValidator } from "#src/core/codegen/index.js";
 import type { RefEntry } from "#src/core/extract/index.js";
 import { extractSchema } from "#src/core/extract/index.js";
-import { FIN_DECL, FIN_DEFERRED_DECL } from "#src/core/iife.js";
+import { FAIL_CLASS_DECL, FIN_DECL, FIN_DEFERRED_DECL } from "#src/core/iife.js";
 import type { SafeParseResult } from "#src/core/types.js";
 
-const localizedFin = new Function("__zcMsg", "__zcZodError", `${FIN_DECL}; return __zcFin;`)(
-  z.config().localeError,
-  ZodRealError,
-);
+const localizedFin = new Function(
+  "__zcMsg",
+  "__zcZodError",
+  `${FAIL_CLASS_DECL}${FIN_DECL}; return __zcFin;`,
+)(z.config().localeError, ZodRealError);
 
 interface ZodLikeSchema {
   safeParse: (input: unknown) => {
@@ -44,7 +45,7 @@ function compileLikeProduction(
     "__zcZodError",
     "__zcFin",
     "__rf",
-    `${FIN_DEFERRED_DECL}\n${generated.code}\nreturn ${generated.functionDef};`,
+    `${FAIL_CLASS_DECL}${FIN_DEFERRED_DECL}\n${generated.code}\nreturn ${generated.functionDef};`,
   );
   return factory(
     z.config().localeError,

@@ -5,6 +5,7 @@ import picomatch from "picomatch";
 import type { CodegenMode } from "#src/core/codegen/context.js";
 import { SHARED_BLOCK_MARKER } from "#src/core/codegen/dedupe.js";
 import {
+  FAIL_CLASS_DECL,
   FIN_DECL,
   FIN_DEFERRED_DECL,
   generateIIFE,
@@ -470,10 +471,17 @@ function computeRuntimePrefix(
   if (!code.includes("function __zcMkv(")) {
     prefix.push(MK_VALIDATOR_DECL);
   }
-  if (!code.includes("function __zcFin(")) {
+  // __zcFin and __zcFinD both construct __ZcFail; declare it once before either,
+  // guarding against a header already shipped earlier in the same module.
+  const needsFin = !code.includes("function __zcFin(");
+  const needsFinD = code.includes("__zcFinD(") && !code.includes("function __zcFinD(");
+  if ((needsFin || needsFinD) && !code.includes("function __ZcFail(")) {
+    prefix.push(FAIL_CLASS_DECL);
+  }
+  if (needsFin) {
     prefix.push(FIN_DECL);
   }
-  if (code.includes("__zcFinD(") && !code.includes("function __zcFinD(")) {
+  if (needsFinD) {
     prefix.push(FIN_DEFERRED_DECL);
   }
   return prefix.length > 0 ? `${prefix.join("\n")}\n` : null;

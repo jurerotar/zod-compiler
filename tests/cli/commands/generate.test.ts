@@ -3,9 +3,11 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { ZodRealError, type z } from "zod";
-import { FIN_DECL, FIN_DEFERRED_DECL } from "#src/core/iife.js";
+import { FAIL_CLASS_DECL, FIN_DECL, FIN_DEFERRED_DECL } from "#src/core/iife.js";
 
-const __zcFin = new Function("__zcZodError", `${FIN_DECL}; return __zcFin;`)(ZodRealError);
+const __zcFin = new Function("__zcZodError", `${FAIL_CLASS_DECL}${FIN_DECL}; return __zcFin;`)(
+  ZodRealError,
+);
 
 import {
   findSchemaFiles,
@@ -373,7 +375,7 @@ describe("generate E2E", () => {
     const safeParseFn = new Function(
       "__zcZodError",
       "__zcFin",
-      `${FIN_DEFERRED_DECL}\n${result.code}\nreturn ${result.functionDef};`,
+      `${FAIL_CLASS_DECL}${FIN_DEFERRED_DECL}\n${result.code}\nreturn ${result.functionDef};`,
     )(ZodRealError, __zcFin) as (input: unknown) => SafeParseResult<unknown>;
 
     // Valid input
@@ -425,7 +427,7 @@ describe("generate E2E", () => {
     const safeParseFn = new Function(
       "__zcZodError",
       "__zcFin",
-      `${FIN_DEFERRED_DECL}\n${result.code}\nreturn ${result.functionDef};`,
+      `${FAIL_CLASS_DECL}${FIN_DEFERRED_DECL}\n${result.code}\nreturn ${result.functionDef};`,
     )(ZodRealError, __zcFin) as (input: unknown) => SafeParseResult<unknown>;
 
     const validInput = { name: "Bob", age: 30 };
@@ -448,7 +450,7 @@ describe("generate E2E", () => {
     const safeParseFn = new Function(
       "__zcZodError",
       "__zcFin",
-      `${FIN_DEFERRED_DECL}\n${result.code}\nreturn ${result.functionDef};`,
+      `${FAIL_CLASS_DECL}${FIN_DEFERRED_DECL}\n${result.code}\nreturn ${result.functionDef};`,
     )(ZodRealError, __zcFin) as (input: unknown) => SafeParseResult<unknown>;
 
     const invalidInput = { name: "", age: -1 };

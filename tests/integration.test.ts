@@ -3,11 +3,13 @@ import { ZodRealError, z } from "zod";
 import { generateValidator } from "#src/core/codegen/index.js";
 import type { RefEntry } from "#src/core/extract/index.js";
 import { extractSchema } from "#src/core/extract/index.js";
-import { FIN_DECL, FIN_DEFERRED_DECL } from "#src/core/iife.js";
+import { FAIL_CLASS_DECL, FIN_DECL, FIN_DEFERRED_DECL } from "#src/core/iife.js";
 import type { SafeParseResult, SchemaIR } from "#src/core/types.js";
 import { zodAtLeast } from "./zod-version.js";
 
-const __zcFin = new Function("__zcZodError", `${FIN_DECL}; return __zcFin;`)(ZodRealError);
+const __zcFin = new Function("__zcZodError", `${FAIL_CLASS_DECL}${FIN_DECL}; return __zcFin;`)(
+  ZodRealError,
+);
 
 /**
  * End-to-end helper: Zod schema → extract IR → generate code → compile → safeParse.
@@ -19,7 +21,7 @@ function compileZodSchema(schema: z.ZodType, name = "test") {
   const fn = new Function(
     "__zcZodError",
     "__zcFin",
-    `${FIN_DEFERRED_DECL}\n${result.code}\nreturn ${result.functionDef};`,
+    `${FAIL_CLASS_DECL}${FIN_DEFERRED_DECL}\n${result.code}\nreturn ${result.functionDef};`,
   );
   return fn(ZodRealError, __zcFin) as (input: unknown) => {
     success: boolean;
@@ -1144,12 +1146,12 @@ function compileWithRefs(schema: z.ZodType, name = "test") {
         "__zcZodError",
         "__zcFin",
         "__rf",
-        `${FIN_DEFERRED_DECL}\n${result.code}\nreturn ${result.functionDef};`,
+        `${FAIL_CLASS_DECL}${FIN_DEFERRED_DECL}\n${result.code}\nreturn ${result.functionDef};`,
       )(ZodRealError, __zcFin, refSchemas) as (input: unknown) => SafeParseResult<unknown>)
     : (new Function(
         "__zcZodError",
         "__zcFin",
-        `${FIN_DEFERRED_DECL}\n${result.code}\nreturn ${result.functionDef};`,
+        `${FAIL_CLASS_DECL}${FIN_DEFERRED_DECL}\n${result.code}\nreturn ${result.functionDef};`,
       )(ZodRealError, __zcFin) as (input: unknown) => SafeParseResult<unknown>);
 }
 
@@ -3031,15 +3033,16 @@ describe("integration — refine custom message", () => {
     const refEntries: RefEntry[] = [];
     const ir = extractSchema(schema, refEntries);
     const generated = generateValidator(ir, "refineNoMsg", { refCount: refEntries.length });
-    const localizedFin = new Function("__zcMsg", "__zcZodError", `${FIN_DECL}; return __zcFin;`)(
-      z.config().localeError,
-      ZodRealError,
-    );
+    const localizedFin = new Function(
+      "__zcMsg",
+      "__zcZodError",
+      `${FAIL_CLASS_DECL}${FIN_DECL}; return __zcFin;`,
+    )(z.config().localeError, ZodRealError);
     const safeParse = new Function(
       "__zcMsg",
       "__zcZodError",
       "__zcFin",
-      `${FIN_DEFERRED_DECL}\n${generated.code}\nreturn ${generated.functionDef};`,
+      `${FAIL_CLASS_DECL}${FIN_DEFERRED_DECL}\n${generated.code}\nreturn ${generated.functionDef};`,
     )(z.config().localeError, ZodRealError, localizedFin) as (
       input: unknown,
     ) => SafeParseResult<unknown>;
